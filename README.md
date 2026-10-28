@@ -5,7 +5,7 @@ A dedicated deployment copy of the **NextStep Job Application Journal**. Hosting
 - **Hosting repository:** https://github.com/johanisdone/mernhost
 - **Assessment repository:** https://github.com/johanisdone/mernfinal
 - **Source snapshot:** `ed7e19c34e8bc3d468a3529a4a44f918aadc2593`
-- **Hosted URL:** pending deployment from this repository.
+- **Hosted URL:** https://nextstep-journal.onrender.com
 
 ## Application
 
@@ -102,7 +102,9 @@ npm run test:ui
 
 Isolated tests do not access Atlas. To repeat the real Atlas browser check against a dedicated `mernfinal_exam` database, configure a private local environment file and run `npm run verify:atlas`. It creates and removes only its own uniquely named verification fixture.
 
-The hosting copy passed **17 API/hosting scenarios and 10 browser scenarios** after a clean dependency install and production build. The Atlas evidence copied from the source snapshot refers to the previously verified exam database journey. The new hosted URL must be checked after deployment.
+The hosting copy passed **17 API/hosting scenarios and 10 browser scenarios** after a clean dependency install and production build. The Atlas evidence copied from the source snapshot refers to the previously verified exam database journey.
+
+The [live smoke check](docs/evidence/hosted.json) passed eight checks against https://nextstep-journal.onrender.com: frontend rendering, database health, API counts/list/search/options, form and detail deep links, empty-form feedback, mobile layout, and no uncaught JavaScript errors. This check did not create or modify application records; full hosted CRUD was not rerun.
 
 ## Views
 
@@ -112,11 +114,11 @@ The hosting copy passed **17 API/hosting scenarios and 10 browser scenarios** af
 
 ## Deployment acceptance
 
-- [ ] Assigned HTTPS URL loads the application.
-- [ ] `/api/health` reports `ready: true`.
+- [x] Assigned HTTPS URL loads the application.
+- [x] `/api/health` reports `ready: true`.
 - [ ] Add, search, filter, view, edit, status change, and allowed deletion work.
 - [ ] Duplicate, future-date, final-status, and forbidden-deletion rules hold.
-- [ ] Refreshing `/applications/:id` serves the SPA correctly.
-- [ ] Mobile layout works and requests target the same origin.
+- [x] Refreshing `/applications/:id` serves the SPA correctly.
+- [x] Mobile layout works and requests target the same origin.
 
 The public tracker is a single shared journal. Use fictional data for the demonstration. The assessment repository is not modified as part of hosting setup.

@@ -1,0 +1,16 @@
+{
+  "url": "https://nextstep-journal.onrender.com",
+  "verifiedAt": "2026-10-28T05:27:09.217Z",
+  "checks": [
+    "HTTPS frontend and its production assets load and render the workspace.",
+    "Live database health returns success=true and ready=true.",
+    "Live counts, listing, backend company/status filtering, and form-options APIs respond correctly.",
+    "Application form navigation and direct route refresh work on the hosted SPA.",
+    "Empty form validation is visible; no application is submitted.",
+    "An existing application detail and timeline render after deep-link refresh.",
+    "Mobile workspace renders at 390px without horizontal page overflow.",
+    "No uncaught JavaScript errors were observed in the live smoke check."
+  ],
+  "pageErrors": [],
+  "scope": "Read-only APIs, live page rendering/routing, client-only invalid-form validation, and mobile layout. No records were created, edited, transitioned, or deleted. Full hosted CRUD was not rerun in this smoke check."
+}

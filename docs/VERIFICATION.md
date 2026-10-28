@@ -46,4 +46,10 @@ Fresh evaluator machines still need network access permitted by the Atlas projec
 
 ## Environment and scope
 
-The application is for one job seeker's journal, as specified. Authentication, file uploads, email reminders, and external job scraping are not part of the requested assessment. There is no claim of a measured plagiarism percentage or production-load performance. The original assessment repository includes its required exam-only environment file. This separate hosting repository uses ignored local environment files and provider-managed settings instead. Copied evidence refers to the original implementation; verify the new hosted deployment separately.
+The application is for one job seeker's journal, as specified. Authentication, file uploads, email reminders, and external job scraping are not part of the requested assessment. There is no claim of a measured plagiarism percentage or production-load performance. The original assessment repository includes its required exam-only environment file. This separate hosting repository uses ignored local environment files and provider-managed settings instead.
+
+## Hosted deployment smoke check
+
+Live application: https://nextstep-journal.onrender.com
+
+Eight live checks passed, recorded in [evidence/hosted.json](evidence/hosted.json). HTTPS rendering, database readiness, counts/list/filter/options APIs, form and existing-detail deep-link refresh, empty-form validation, and mobile overflow were checked. No application data was changed. The existing full mutation tests and Atlas integration evidence are distinct from this read-only hosted check.
