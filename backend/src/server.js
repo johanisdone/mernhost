@@ -7,6 +7,9 @@ import { handleProblem } from './middleware/responses.js';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import cookieParser from 'cookie-parser';
+import { accountRoutes } from './routes/accounts.js';
+import { RequestProblem } from './middleware/responses.js';
 
 export function browserOrigin() {
   const configured = process.env.FRONTEND_ORIGIN?.trim() || process.env.RENDER_EXTERNAL_URL?.trim() || 'http://localhost:5174';
@@ -17,15 +20,25 @@ export function browserOrigin() {
 
 export function makeServer() {
   const app = express();
+  app.locals.browserOrigin = browserOrigin();
   app.disable('x-powered-by');
+  app.set('trust proxy', process.env.TRUST_PROXY === '1' || Boolean(process.env.RENDER_EXTERNAL_URL) ? 1 : false);
   app.use(helmet());
-  app.use(cors({ origin: browserOrigin() }));
+  app.use(cors({ origin: (origin, callback) => callback(null, app.locals.browserOrigin), credentials: true }));
   app.use(express.json({ limit: '24kb' }));
+  app.use(cookieParser());
   app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+  app.use('/api', (req, res, next) => {
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.get('Origin') && req.get('Origin') !== app.locals.browserOrigin) {
+      return next(new RequestProblem(403, 'This origin is not allowed to modify your journal.'));
+    }
+    next();
+  });
   app.get('/api/health', (req, res) => {
     const ready = mongoose.connection.readyState === 1;
     res.status(ready ? 200 : 503).json({ success: ready, message: ready ? 'Database connected.' : 'Database unavailable.', data: { ready } });
   });
+  app.use('/api/auth', accountRoutes());
   app.use('/api/applications', applicationRoutes);
   app.use('/api', (req, res) => res.status(404).json({ success: false, message: 'Endpoint not found.', data: null }));
   const builtFrontend = fileURLToPath(new URL('../../frontend/dist', import.meta.url));

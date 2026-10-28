@@ -11,6 +11,7 @@ export const answer = (res, code, message, data) => res.status(code).json({ succ
 export function handleProblem(error, req, res, next) {
   if (res.headersSent) return next(error);
   if (error.code === 11000) {
+    if (error.keyPattern?.email) return res.status(409).json({ success: false, message: 'An account with this email already exists. Please sign in.', data: null });
     return res.status(409).json({ success: false, message: 'An active application already exists for this company and role.', data: null });
   }
   let code = error instanceof RequestProblem ? error.code : error.status;

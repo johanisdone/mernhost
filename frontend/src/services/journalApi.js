@@ -14,6 +14,7 @@ export async function journalApi(path, { method = 'GET', payload, signal } = {})
     response = await fetch(endpoint + path, {
       method,
       signal,
+      credentials: 'include',
       headers: payload === undefined ? {} : { 'Content-Type': 'application/json' },
       body: payload === undefined ? undefined : JSON.stringify(payload)
     });
@@ -23,6 +24,7 @@ export async function journalApi(path, { method = 'GET', payload, signal } = {})
   }
   const envelope = await response.json().catch(() => null);
   if (!response.ok || !envelope?.success) {
+    if (response.status === 401 && !path.startsWith('/auth/')) window.dispatchEvent(new Event('nextstep-session-ended'));
     throw new JournalError(envelope?.message || 'The server could not complete this request. Please try again.', response.status, envelope?.data);
   }
   return envelope.data;

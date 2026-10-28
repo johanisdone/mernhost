@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { randomBytes } from 'node:crypto';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { chromium } from 'playwright';
@@ -25,12 +26,17 @@ try {
   const server = makeServer();
   listener = await new Promise(resolve => { const active = server.listen(0, '127.0.0.1', () => resolve(active)); });
   const origin = `http://127.0.0.1:${listener.address().port}`;
+  server.locals.browserOrigin = origin;
+  const accountPassword = randomBytes(20).toString('hex');
+  let apiCookie = '';
   async function call(path, method = 'GET', payload) {
-    const response = await fetch(origin + '/api' + path, { method, headers: { 'Content-Type': 'application/json' }, body: payload === undefined ? undefined : JSON.stringify(payload) });
+    const response = await fetch(origin + '/api' + path, { method, headers: { 'Content-Type': 'application/json', ...(apiCookie ? { Cookie: apiCookie } : {}) }, body: payload === undefined ? undefined : JSON.stringify(payload) });
     const envelope = await response.json();
     assert.ok(envelope.success, envelope.message);
+    if (response.headers.get('set-cookie')) apiCookie = response.headers.get('set-cookie').split(';')[0];
     return envelope.data;
   }
+  const primaryAccount = await call('/auth/register', 'POST', { name: 'Alex Demo', email: 'alex@example.test', password: accountPassword });
   const daysAgo = amount => {
     const date = new Date(currentDay() + 'T00:00:00Z');
     date.setUTCDate(date.getUTCDate() - amount);
@@ -71,7 +77,44 @@ try {
   }
 
   await page.goto(origin, { waitUntil: 'networkidle' });
+  await page.getByRole('heading', { name: 'Welcome back.', exact: true }).waitFor();
+  assert.ok(page.url().endsWith('/login'));
+  await capture('07-sign-in.png');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.getByText('Enter a valid email address.', { exact: true }).waitFor();
+  checks.push('Unauthenticated visitors are sent to sign-in and empty credentials show inline validation.');
+  await page.getByRole('link', { name: 'Create an account', exact: true }).click();
+  await page.getByRole('heading', { name: 'Make room for possibility.', exact: true }).waitFor();
+  await capture('08-register.png');
+  await page.getByLabel('Your name', { exact: true }).fill('Taylor Demo');
+  await page.getByLabel('Email address', { exact: true }).fill('taylor@example.test');
+  await page.getByLabel('Password', { exact: true }).fill(accountPassword);
+  await page.getByRole('button', { name: 'Create my journal', exact: true }).click();
+  await page.getByRole('heading', { name: 'Your next chapter starts here.', exact: true }).waitFor();
+  await capture('09-private-empty-journal.png');
+  assert.equal(await page.getByText('Aster Labs', { exact: true }).count(), 0);
+  const denied = await page.evaluate(async id => (await fetch(`/api/applications/${id}`)).status, seeded[0]._id);
+  assert.equal(denied, 404);
+  checks.push('Registration opens an empty private journal and another account’s known application ID returns 404.');
+  await page.getByRole('link', { name: 'Add an application', exact: true }).click();
+  await page.getByLabel('Company name *', { exact: true }).fill('Infosys');
+  await page.getByLabel('Job role *', { exact: true }).fill('Frontend Developer');
+  await page.getByRole('button', { name: 'Save application', exact: true }).click();
+  await page.getByRole('heading', { name: 'Frontend Developer', exact: true }).waitFor();
+  const secondaryId = page.url().split('/').at(-1);
+  const secondaryRecord = await Application.findById(secondaryId);
+  assert.notEqual(secondaryRecord.owner.toString(), primaryAccount.id);
+  assert.equal(secondaryRecord.applicationId, 'JA-INF-001');
+  checks.push('A second user can apply to the same company/role with an independent application sequence.');
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await page.getByRole('heading', { name: 'Welcome back.', exact: true }).waitFor();
+  await page.getByLabel('Email address', { exact: true }).fill('alex@example.test');
+  await page.getByLabel('Password', { exact: true }).fill(accountPassword);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.getByText('Showing 1–9 of 9 applications').waitFor();
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.getByText('Showing 1–9 of 9 applications').waitFor();
+  checks.push('Sign-in and refresh restore the first account’s session without showing the second account’s record.');
   await capture('01-workspace-desktop.png');
   checks.push('Workspace retrieves all six status counts and persisted application cards.');
   await page.getByLabel('Filter by status').selectOption('Interview');
@@ -181,6 +224,19 @@ try {
   await page.getByRole('heading', { name: 'A little update.' }).waitFor();
   await capture('06-edit-mobile.png');
   checks.push('Dashboard, timeline, and form pass 390px layout/accessibility checks; detail deep-link refresh works.');
+
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await page.getByRole('heading', { name: 'Welcome back.', exact: true }).waitFor();
+  await capture('10-sign-in-mobile.png');
+  await page.getByLabel('Email address', { exact: true }).fill('taylor@example.test');
+  await page.getByLabel('Password', { exact: true }).fill(accountPassword);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.getByText('Showing 1–1 of 1 applications').waitFor();
+  assert.equal(await page.getByText('Extra Company 0', { exact: true }).count(), 0);
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await page.goto(origin + '/applications/new', { waitUntil: 'networkidle' });
+  await page.getByRole('heading', { name: 'Welcome back.', exact: true }).waitFor();
+  checks.push('Switching accounts clears the prior dashboard, and signed-out deep links cannot reopen a private page.');
 
   assert.deepEqual(errors, []);
   await writeFile(new URL('browser.json', evidenceFolder), JSON.stringify({ runAt: new Date().toISOString(), database: 'isolated MongoDB 8.2.6 (not Atlas)', checks, scans, errors }, null, 2));

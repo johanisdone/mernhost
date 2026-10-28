@@ -1,7 +1,11 @@
 {
-  "runAt": "2026-10-28T05:12:25.827Z",
+  "runAt": "2026-10-28T05:51:46.466Z",
   "database": "isolated MongoDB 8.2.6 (not Atlas)",
   "checks": [
+    "Unauthenticated visitors are sent to sign-in and empty credentials show inline validation.",
+    "Registration opens an empty private journal and another account’s known application ID returns 404.",
+    "A second user can apply to the same company/role with an independent application sequence.",
+    "Sign-in and refresh restore the first account’s session without showing the second account’s record.",
     "Workspace retrieves all six status counts and persisted application cards.",
     "Backend status filtering, company search, and overdue display work.",
     "Client validation prevents empty save; a valid application persists through the frontend.",
@@ -11,9 +15,22 @@
     "Frontend rejects future dates and displays a backend 409 duplicate message without clearing the form.",
     "Pagination loads both pages; no-match search shows a helpful empty state.",
     "A simulated API failure shows a retry control and retry recovers persisted results.",
-    "Dashboard, timeline, and form pass 390px layout/accessibility checks; detail deep-link refresh works."
+    "Dashboard, timeline, and form pass 390px layout/accessibility checks; detail deep-link refresh works.",
+    "Switching accounts clears the prior dashboard, and signed-out deep links cannot reopen a private page."
   ],
   "scans": [
+    {
+      "screen": "07-sign-in.png",
+      "violations": []
+    },
+    {
+      "screen": "08-register.png",
+      "violations": []
+    },
+    {
+      "screen": "09-private-empty-journal.png",
+      "violations": []
+    },
     {
       "screen": "01-workspace-desktop.png",
       "violations": []
@@ -36,6 +53,10 @@
     },
     {
       "screen": "06-edit-mobile.png",
+      "violations": []
+    },
+    {
+      "screen": "10-sign-in-mobile.png",
       "violations": []
     }
   ],

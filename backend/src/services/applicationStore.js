@@ -5,7 +5,7 @@ import { RequestProblem } from '../middleware/responses.js';
 
 export function forClient(record) {
   const value = record.toObject ? record.toObject() : { ...record };
-  const { companyKey, roleKey, isActive, __v, ...publicFields } = value;
+  const { companyKey, roleKey, isActive, __v, owner, ...publicFields } = value;
   return {
     ...publicFields,
     isOverdue: value.status === 'Applied' && currentDay() > value.followUpDate,
@@ -14,14 +14,16 @@ export function forClient(record) {
   };
 }
 
-export async function findApplication(id) {
-  const item = await Application.findById(id);
+export async function findApplication(id, owner) {
+  if (!owner) throw new RequestProblem(401, 'Please sign in to open your journal.');
+  const item = await Application.findOne({ _id: id, owner });
   if (!item) throw new RequestProblem(404, 'This application could not be found.');
   return item;
 }
 
-export async function ensureNoActiveDuplicate(input, excludingId) {
-  const filter = { companyKey: input.companyKey, roleKey: input.roleKey, isActive: true };
+export async function ensureNoActiveDuplicate(input, owner, excludingId) {
+  if (!owner) throw new RequestProblem(401, 'Please sign in to open your journal.');
+  const filter = { owner, companyKey: input.companyKey, roleKey: input.roleKey, isActive: true };
   if (excludingId) filter._id = { $ne: excludingId };
   if (await Application.exists(filter)) throw new RequestProblem(409, 'You already have an active application for this company and role. Finish it before adding another.');
 }
@@ -43,15 +45,15 @@ async function nextNumber(companyKey) {
   }
 }
 
-export async function insertApplication(input) {
-  await ensureNoActiveDuplicate(input);
+export async function insertApplication(input, owner) {
+  await ensureNoActiveDuplicate(input, owner);
   const prefix = input.companyName.match(/[a-z]/gi).slice(0, 3).join('').toUpperCase();
   for (let attempt = 0; attempt < 999; attempt++) {
-    const sequence = await nextNumber(input.companyKey);
+    const sequence = await nextNumber(`${owner}:${input.companyKey}`);
     const applicationId = `JA-${prefix}-${String(sequence).padStart(3, '0')}`;
     try {
       return await Application.create({
-        ...input, applicationId, status: 'Applied', isActive: true,
+        ...input, owner, applicationId, status: 'Applied', isActive: true,
         followUpDate: followUpFor(input.appliedDate),
         statusHistory: [{ status: 'Applied', changedAt: new Date() }]
       });

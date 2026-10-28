@@ -1,0 +1,17 @@
+{
+  "runAt": "2026-10-28T05:43:18.010Z",
+  "environment": "Isolated MongoDB; session and ownership integration",
+  "passed": 10,
+  "checks": [
+    "Registration hashes passwords and stores only a digest of an HttpOnly session token",
+    "Bad account input, duplicate emails, unexpected identity fields, and overlong passwords are rejected",
+    "Login rotates sessions and logout revokes replay of the old cookie",
+    "Expired sessions, malformed tokens, and deleted accounts cannot access a journal",
+    "Every application data endpoint requires a valid session",
+    "Two accounts have independent lists, counts, overdue counts, duplicates, and company sequences",
+    "Guessing another owner ID cannot read, edit, delete, or transition their application",
+    "Unowned legacy rows and old shared collections are never assigned to a new account",
+    "Cross-origin mutations are blocked and account attempts are rate limited",
+    "Production sessions use Secure cookies and public exam database configuration is rejected"
+  ]
+}

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { STAGES, JOB_TYPES } from '../domain/stages.js';
+import { Account, LoginSession } from './Account.js';
 
 const historySchema = new mongoose.Schema({
   status: { type: String, enum: STAGES, required: true },
@@ -7,7 +8,8 @@ const historySchema = new mongoose.Schema({
 }, { _id: false });
 
 const applicationSchema = new mongoose.Schema({
-  applicationId: { type: String, required: true, unique: true, immutable: true },
+  owner: { type: mongoose.Schema.Types.ObjectId, ref: 'Account', required: true, immutable: true },
+  applicationId: { type: String, required: true, immutable: true },
   companyName: { type: String, required: true, maxlength: 120 },
   companyKey: { type: String, required: true, maxlength: 120 },
   jobRole: { type: String, required: true, maxlength: 120 },
@@ -22,22 +24,23 @@ const applicationSchema = new mongoose.Schema({
   statusHistory: { type: [historySchema], required: true }
 }, { timestamps: true });
 
-applicationSchema.index({ companyKey: 1, roleKey: 1 }, {
+applicationSchema.index({ owner: 1, applicationId: 1 }, { unique: true });
+applicationSchema.index({ owner: 1, companyKey: 1, roleKey: 1 }, {
   unique: true,
   partialFilterExpression: { isActive: true },
-  name: 'one_active_company_role'
+  name: 'one_active_company_role_per_owner'
 });
-applicationSchema.index({ status: 1, createdAt: -1 });
-applicationSchema.index({ createdAt: -1 });
+applicationSchema.index({ owner: 1, status: 1, createdAt: -1 });
+applicationSchema.index({ owner: 1, createdAt: -1 });
 
-export const Application = mongoose.model('Application', applicationSchema);
+export const Application = mongoose.model('Application', applicationSchema, 'private_applications');
 
 const counterSchema = new mongoose.Schema({
   _id: { type: String },
   value: { type: Number, required: true, default: 0 }
 }, { versionKey: false });
-export const CompanyCounter = mongoose.model('CompanyCounter', counterSchema);
+export const CompanyCounter = mongoose.model('CompanyCounter', counterSchema, 'private_company_counters');
 
 export async function prepareIndexes() {
-  await Promise.all([Application.init(), CompanyCounter.init()]);
+  await Promise.all([Application.init(), CompanyCounter.init(), Account.init(), LoginSession.init()]);
 }

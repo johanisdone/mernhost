@@ -3,14 +3,13 @@ import mongoose from 'mongoose';
 import { fileURLToPath } from 'node:url';
 import { makeServer } from './server.js';
 import { prepareIndexes } from './models/Application.js';
+import { requirePrivateDatabase } from './config/privateDatabase.js';
 
 dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
 
 async function launch() {
   const uri = process.env.MONGODB_URI;
-  if (!uri || !uri.startsWith('mongodb+srv://')) {
-    throw new Error('Set MONGODB_URI in backend/.env to the dedicated exam MongoDB Atlas connection string.');
-  }
+  requirePrivateDatabase(uri);
   new Intl.DateTimeFormat('en-CA', { timeZone: process.env.APP_TIMEZONE || 'Asia/Kolkata' }).format(new Date());
   await mongoose.connect(uri, { serverSelectionTimeoutMS: 12000 });
   await prepareIndexes();

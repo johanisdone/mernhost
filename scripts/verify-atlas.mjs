@@ -10,12 +10,13 @@ import { chromium } from 'playwright';
 import { makeServer } from '../backend/src/server.js';
 import { Application, CompanyCounter, prepareIndexes } from '../backend/src/models/Application.js';
 import { currentDay } from '../backend/src/domain/calendar.js';
+import { Account, LoginSession } from '../backend/src/models/Account.js';
+import { requirePrivateDatabase } from '../backend/src/config/privateDatabase.js';
 
 dotenv.config({ path: fileURLToPath(new URL('../backend/.env', import.meta.url)) });
-let address;
-try { address = new URL(process.env.MONGODB_URI || ''); } catch { /* handled without printing credentials */ }
-if (!address || address.protocol !== 'mongodb+srv:' || address.pathname !== '/mernfinal_exam') {
-  console.error('Atlas verification needs an exam-only mongodb+srv URI for /mernfinal_exam in backend/.env. No connection attempted.');
+try { requirePrivateDatabase(process.env.MONGODB_URI); }
+catch {
+  console.error('Configure backend/.env with a private Atlas user and database such as /nextstep_private. The public exam account/database must not be used. No connection attempted.');
   process.exit(1);
 }
 if (!existsSync(new URL('../frontend/dist/index.html', import.meta.url))) {
@@ -27,6 +28,8 @@ const code = [...randomBytes(5)].map(value => String.fromCharCode(65 + value % 2
 const company = `${code} Verification ${Date.now()}`;
 const role = 'Temporary integration check';
 const checks = [];
+const accountEmail = `verification-${randomBytes(12).toString('hex')}@example.test`;
+const accountPassword = randomBytes(24).toString('hex');
 let listener, browser, createdId;
 const referenceDate = new Date(currentDay() + 'T00:00:00Z');
 referenceDate.setUTCDate(referenceDate.getUTCDate() - 10);
@@ -38,6 +41,7 @@ try {
   const server = makeServer();
   listener = await new Promise(resolve => { const active = server.listen(0, '127.0.0.1', () => resolve(active)); });
   const origin = `http://127.0.0.1:${listener.address().port}`;
+  server.locals.browserOrigin = origin;
   browser = await chromium.launch();
   const context = await browser.newContext({ viewport: { width: 1440, height: 1050 } });
   const page = await context.newPage();
@@ -46,11 +50,19 @@ try {
   page.on('pageerror', error => pageErrors.push(error.message));
 
   await page.goto(origin, { waitUntil: 'networkidle' });
+  await page.getByRole('heading', { name: 'Welcome back.', exact: true }).waitFor();
+  await page.getByRole('link', { name: 'Create an account', exact: true }).click();
+  await page.getByLabel('Your name', { exact: true }).fill('Private Atlas Verification');
+  await page.getByLabel('Email address', { exact: true }).fill(accountEmail);
+  await page.getByLabel('Password', { exact: true }).fill(accountPassword);
+  await page.getByRole('button', { name: 'Create my journal', exact: true }).click();
+  await page.getByRole('heading', { name: 'Your next chapter starts here.', exact: true }).waitFor();
+  checks.push('Private registration created an account and opened an empty owner-scoped journal.');
   await page.getByRole('link', { name: 'New application', exact: true }).click();
   await page.getByLabel('Company name *', { exact: true }).fill(company);
   await page.getByLabel('Job role *', { exact: true }).fill(role);
   await page.getByLabel('Applied date *', { exact: true }).fill(appliedDate);
-  await page.getByLabel('Notes (optional)', { exact: true }).fill('Temporary automated exam integration fixture; removed after verification.');
+  await page.getByLabel('Notes (optional)', { exact: true }).fill('Temporary private-account integration fixture; removed after verification.');
   await page.getByRole('button', { name: 'Save application', exact: true }).click();
   await page.getByRole('heading', { name: role, exact: true }).waitFor();
   createdId = page.url().split('/').at(-1);
@@ -85,8 +97,8 @@ try {
   await page.getByRole('button', { name: 'Update status', exact: true }).click();
   await page.getByText('2 events', { exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: `Delete ${stored.applicationId}`, exact: true }).isDisabled(), true);
-  const blocked = await fetch(`${origin}/api/applications/${createdId}`, { method: 'DELETE' });
-  assert.equal(blocked.status, 400);
+  const blockedStatus = await page.evaluate(async id => (await fetch(`/api/applications/${id}`, { method: 'DELETE' })).status, createdId);
+  assert.equal(blockedStatus, 400);
   await page.getByLabel('Next status', { exact: true }).selectOption('Offer');
   await page.getByRole('button', { name: 'Update status', exact: true }).click();
   await page.getByText('3 events', { exact: true }).waitFor();
@@ -102,11 +114,18 @@ try {
   await page.getByRole('heading', { name: 'Your applications', exact: false }).waitFor();
   assert.equal(await Application.findById(createdId), null);
   checks.push('A final status locked the workflow; confirmed frontend deletion removed the Atlas record.');
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await page.getByRole('heading', { name: 'Welcome back.', exact: true }).waitFor();
+  await page.getByLabel('Email address', { exact: true }).fill(accountEmail);
+  await page.getByLabel('Password', { exact: true }).fill(accountPassword);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.getByRole('heading', { name: 'Your next chapter starts here.', exact: true }).waitFor();
+  checks.push('Sign-out and sign-in restored the same private account with its deleted fixture absent.');
   assert.deepEqual(pageErrors, []);
 
   const folder = new URL('../docs/evidence/', import.meta.url);
   await mkdir(folder, { recursive: true });
-  await writeFile(new URL('atlas.json', folder), JSON.stringify({ verified: true, runAt: new Date().toISOString(), database: 'MongoDB Atlas / mernfinal_exam', checks, pageErrors, fixtureCleanup: 'Only the uniquely named verification fixture and counter were removed.' }, null, 2));
+  await writeFile(new URL('private-atlas.json', folder), JSON.stringify({ verified: true, runAt: new Date().toISOString(), database: 'Private MongoDB Atlas hosting database', checks, pageErrors, fixtureCleanup: 'Only the uniquely named verification account, its sessions, applications, and counters were removed.' }, null, 2));
   console.log(`Atlas verification passed: ${checks.length} frontend/backend/database scenarios. Credentials were not printed.`);
 } catch (error) {
   console.error('Atlas verification did not pass:', error.name);
@@ -116,8 +135,13 @@ try {
   process.exitCode = 1;
 } finally {
   if (mongoose.connection.readyState === 1) {
-    await Application.deleteMany({ companyKey: company.toLowerCase() });
-    await CompanyCounter.deleteOne({ _id: company.toLowerCase() });
+    const account = await Account.findOne({ email: accountEmail });
+    if (account) {
+      await Application.deleteMany({ owner: account._id });
+      await LoginSession.deleteMany({ account: account._id });
+      await CompanyCounter.deleteMany({ _id: { $regex: `^${account._id}:` } });
+      await Account.deleteOne({ _id: account._id });
+    }
   }
   if (browser) await browser.close();
   if (listener) await new Promise(resolve => listener.close(resolve));

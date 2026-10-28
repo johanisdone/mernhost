@@ -15,5 +15,7 @@ services:
         value: Asia/Kolkata
       - key: MONGOMS_DISABLE_POSTINSTALL
         value: "1"
+      - key: TRUST_PROXY
+        value: "1"
       - key: MONGODB_URI
         sync: false
